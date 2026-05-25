@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
- build-macos:
+  build-macos:
     runs-on: macos-latest
 
     steps:
@@ -19,6 +19,9 @@ jobs:
       - name: Show macOS Version
         run: sw_vers
 
+      - name: Show System Info
+        run: system_profiler SPSoftwareDataType
+
       - name: Install Dependencies
         run: npm install
 
@@ -29,7 +32,7 @@ jobs:
         run: npx electron-builder --mac dmg
 
       - name: List Dist Files
-        run: ls -la dist
+        run: ls -R dist
 
       - name: Upload macOS Build
         uses: actions/upload-artifact@v4
