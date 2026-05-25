@@ -1,0 +1,214 @@
+{
+  "name": "CybrxAgent",
+  "version": "1.0.0",
+  "description": "CybrX Agent — a secure background monitoring and automation agent.",
+  "author": {
+    "name": "CybrX",
+    "email": "contact@audixindia.in"
+  },
+  "license": "ISC",
+  "private": true,
+  "main": "main.js",
+  "type": "module",
+  "homepage": "https://cybrx.ai/",
+  "scripts": {
+    "start": "electron .",
+     "start:headless": "electron . --no-sandbox --ozone-platform=headless --disable-gpu --disable-software-rasterizer",
+    "dist": "npm run clean && npm run obfuscate && electron-builder",
+    "dist:linux": "npm run clean && bash build/linux/prebuild.sh && npm run obfuscate && electron-builder --linux",
+    "dist:mac": "npm run clean && npm run obfuscate && electron-builder --mac",
+    "obfuscate": "javascript-obfuscator src --output obfuscated/src --compact true --control-flow-flattening true --dead-code-injection true --string-array true --string-array-encoding rc4 --self-defending true && javascript-obfuscator main.js --output obfuscated/main.js --compact true --control-flow-flattening true --dead-code-injection true --string-array true --string-array-encoding rc4 --self-defending true",
+    "clean": "rimraf dist release-builds obfuscated"
+  },
+  "dependencies": {
+    "alert": "^6.0.2",
+    "auto-launch": "^5.0.6",
+    "axios": "^1.7.7",
+    "cron-parser": "^4.9.0",
+    "electron-debug": "^4.1.0",
+    "electron-store": "^8.2.0",
+    "express": "^4.21.2",
+    "git": "^0.1.5",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.7.0",
+    "node-windows": "^1.0.0-beta.8",
+    "ps-node": "^0.1.6",
+    "sweetalert2": "^11.16.0",
+    "systeminformation": "^5.25.11",
+    "uuid": "^13.0.0",
+    "winreg": "^1.2.5"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.5.0",
+    "cpy-cli": "^5.0.0",
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-notarize": "^1.2.2",
+    "javascript-obfuscator": "^4.1.1",
+    "rimraf": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.cybrx.agent",
+    "productName": "CybrxAgent",
+    "copyright": "Copyright © 2025 CybrX",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      {
+        "from": "obfuscated",
+        "to": ".",
+        "filter": ["**/*"]
+      },
+      "package.json",
+      "build/**",
+      "node_modules/**",
+      "!node_modules/.cache",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/*.log"
+    ],
+    "extraResources": [
+      {
+        "from": "installers/",
+        "to": "installers",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "build/",
+        "to": "build/",
+        "filter": [
+          "*.ico"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/audix.ico"
+    },
+    "nsis": {
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "installerIcon": "build/audix.ico",
+      "uninstallerIcon": "build/audix.ico",
+      "include": "build/installer.nsh",
+      "artifactName": "CybrxAgent-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": true
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "build/audix.ico",
+      "target": [
+        "dmg",
+        "pkg"
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "build/mac/entitlements.mac.plist",
+      "entitlementsInherit": "build/mac/entitlements.mac.inherit.plist",
+      "gatekeeperAssess": false,
+      "artifactName": "CybrxAgent-${version}-mac.${ext}",
+      "extendInfo": {
+        "LSUIElement": true
+      },
+      "extraResources": [
+        {
+          "from": "build/mac/postinstall.sh",
+          "to": "postinstall.sh"
+        },
+        {
+          "from": "build/mac/uninstall.sh",
+          "to": "uninstall.sh"
+        },
+        {
+          "from": "build/license.txt",
+          "to": "license.txt"
+        }
+      ]
+    },
+    "pkg": {
+      "scripts": "build/mac/pkg-scripts/",
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "isRelocatable": false,
+      "license": "build/license.txt"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "tar.gz"
+      ],
+      "icon": "build/linux/audix.png",
+      "category": "Utility",
+      "executableName": "cybrxagent",
+      "artifactName": "CybrxAgent-${version}.${ext}",
+      "desktop": {
+        "NoDisplay": true
+      },
+      "extraResources": [
+        {
+          "from": "build/linux/",
+          "to": "linux/",
+          "filter": ["**/*"]
+        }
+      ]
+    },
+    "deb": { 
+      "fpm": ["--before-install", "build/linux/deb/preInst"],
+      "afterInstall": "build/linux/deb/postInst",
+      "depends": [
+        "libglib2.0-0",
+        "libnss3",
+        "libatk1.0-0",
+        "libatk-bridge2.0-0",
+        "libcups2",
+        "libdrm2",
+        "libxkbcommon0",
+        "libxcomposite1",
+        "libxdamage1",
+        "libxfixes3",
+        "libxrandr2",
+        "libgbm1",
+        "libasound2",
+        "libxtst6",
+        "libgtk-3-0",
+        "pciutils",
+        "usbutils",
+        "sysstat"
+      ]
+    },
+    "rpm": {
+      "fpm": ["--before-install", "build/linux/rpm/preInst"],
+      "afterInstall": "build/linux/rpm/postInst",
+      "depends": [
+        "glib2",
+        "nss",
+        "atk",
+        "at-spi2-atk",
+        "cups-libs",
+        "libdrm",
+        "libxkbcommon",
+        "libXcomposite",
+        "libXdamage",
+        "libXfixes",
+        "libXrandr",
+        "mesa-libgbm",
+        "alsa-lib",
+        "libXtst",
+        "gtk3",
+        "pciutils",
+        "usbutils",
+        "sysstat"
+      ]
+    },
+    "dmg": {
+      "artifactName": "CybrxAgent-${version}.dmg",
+      "title": "CybrxAgent ${version}",
+      "window": { "width": 540, "height": 380 }
+    }
+  }
+}
