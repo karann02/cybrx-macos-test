@@ -100,7 +100,7 @@
     },
     "mac": {
       "category": "public.app-category.utilities",
-      "icon": "build/audix.ico",
+      "icon": "build/icon.icns",
       "target": [
         "dmg",
         "pkg"
