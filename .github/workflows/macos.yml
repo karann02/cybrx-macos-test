@@ -1,0 +1,44 @@
+name: macOS Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show macOS Version
+        run: sw_vers
+
+      - name: Show System Info
+        run: system_profiler SPSoftwareDataType
+
+      - name: Show CPU Info
+        run: sysctl -n machdep.cpu.brand_string
+
+      - name: Show Disk Info
+        run: diskutil list
+
+      - name: Show Current User
+        run: whoami
+
+      - name: Show Architecture
+        run: uname -m
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Node
+        run: |
+          node -v
+          npm -v
+
+      - name: Done
+        run: echo "macOS runner ready for CybrxAgent testing"
+        
