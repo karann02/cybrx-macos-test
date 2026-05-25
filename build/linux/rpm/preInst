@@ -1,0 +1,61 @@
+#!/bin/bash
+# =============================================================================
+#  CybrxAgent RPM Pre-Install hook  (%pre scriptlet)
+#
+#  Flow:
+#   Check if CYBRX_LICENSE is provided and exists. If not, abort the RPM
+#   installation BEFORE any files are extracted to disk.
+# =============================================================================
+set -euo pipefail
+
+APP_NAME="CybrxAgent"
+
+echo ""
+echo "======================================================"
+echo "  ${APP_NAME} Pre-Install Validation"
+echo "======================================================"
+
+# ── Step 1: Check CYBRX_LICENSE env var ───────────────────────────────────────
+CONF_PATH=""
+if [[ -n "${CYBRX_LICENSE:-}" ]]; then
+  CONF_PATH="${CYBRX_LICENSE/#\~/$HOME}"
+fi
+
+# ── Step 2: Walk process ancestry ─────────────────────────────────────────────
+if [[ -z "$CONF_PATH" ]]; then
+  pid=$PPID
+  depth=0
+  while [[ $pid -gt 1 && $depth -lt 10 ]]; do
+    if [[ -r "/proc/$pid/environ" ]]; then
+      val=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+            | grep '^CYBRX_LICENSE=' | cut -d= -f2- | head -1 || true)
+      if [[ -n "$val" ]]; then
+        CONF_PATH="${val/#\~/$HOME}"
+        break
+      fi
+    fi
+    pid=$(grep '^PPid:' "/proc/$pid/status" 2>/dev/null | awk '{print $2}' || echo 0)
+    (( depth++ )) || true
+  done
+fi
+
+# ── Step 3: Check if license was found ────────────────────────────────────────
+if [[ -z "$CONF_PATH" ]]; then
+  echo ""
+  echo "  [ERROR] No license provided. Installation aborted."
+  echo ""
+  echo "  Please provide the license path via the CYBRX_LICENSE environment variable:"
+  echo "    sudo CYBRX_LICENSE=/path/to/license.conf dnf install -y ./CybrxAgent-1.0.0.rpm"
+  echo ""
+  exit 1
+fi
+
+# ── Step 4: Final validation & Temp Save ──────────────────────────────────────
+if [[ ! -f "$CONF_PATH" ]]; then
+  echo "  [ERROR] License file not found: '${CONF_PATH}'. Installation aborted."
+  exit 1
+fi
+
+echo "$CONF_PATH" > /tmp/.cybrxagent_license_path
+echo "  [INFO] License validation passed (${CONF_PATH}). Proceeding with installation..."
+exit 0

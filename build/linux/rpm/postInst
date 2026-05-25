@@ -1,0 +1,44 @@
+#!/bin/bash
+# =============================================================================
+#  CybrxAgent RPM Post-Install hook  (%post scriptlet)
+#
+#  Flow:
+#   1. Check CYBRX_LICENSE env var (optional — lets advanced users skip prompt)
+#   2. Walk process ancestry to find CYBRX_LICENSE if set before sudo
+#   3. Prompt user interactively for license path if not found above
+#   4. Validate the file exists
+#   5. Run install.sh (creates service user, systemd unit, starts agent)
+# =============================================================================
+set -euo pipefail
+
+APP_NAME="CybrxAgent"
+RESOURCES_DIR="/opt/${APP_NAME}/resources/linux/rpm"
+INSTALL_SCRIPT="${RESOURCES_DIR}/install.sh"
+
+echo ""
+echo "======================================================"
+echo "  ${APP_NAME} RPM Post-Install Configuration"
+echo "======================================================"
+
+if [[ ! -f "$INSTALL_SCRIPT" ]]; then
+  echo "[ERROR] install.sh not found at ${RESOURCES_DIR}"; exit 1
+fi
+chmod +x "$INSTALL_SCRIPT"
+
+# ── Step 1: Read from temp file created by preInst ────────────────────────────
+CONF_PATH=""
+if [[ -f /tmp/.cybrxagent_license_path ]]; then
+  CONF_PATH=$(cat /tmp/.cybrxagent_license_path)
+  rm -f /tmp/.cybrxagent_license_path
+fi
+
+# ── Step 2: Final validation ───────────────────────────────────────────────────
+if [[ -z "$CONF_PATH" || ! -f "$CONF_PATH" ]]; then
+  echo "  [ERROR] License file not found or not passed from preInst: '${CONF_PATH}'. Aborting."
+  exit 1
+fi
+
+# ── Step 3: Run install.sh ─────────────────────────────────────────────────────
+echo "  License: ${CONF_PATH}"
+echo ""
+bash "$INSTALL_SCRIPT" --config "$CONF_PATH"

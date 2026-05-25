@@ -1,0 +1,74 @@
+#!/bin/bash
+set -euo pipefail
+APP_NAME="CybrxAgent"
+RESOURCES_DIR="/opt/${APP_NAME}/resources/linux/deb"
+INSTALL_SCRIPT="${RESOURCES_DIR}/install.sh"
+
+echo ""
+echo "======================================================"
+echo "  ${APP_NAME} DEB Post-Install Configuration"
+echo "======================================================"
+
+if [[ ! -f "$INSTALL_SCRIPT" ]]; then
+  echo "[ERROR] install.sh not found at ${RESOURCES_DIR}"; exit 1
+fi
+chmod +x "$INSTALL_SCRIPT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Locate the license file. Checked in priority order:
+#
+#  1. CYBRX_LICENSE env var (set correctly: sudo CYBRX_LICENSE=... dpkg)
+#  2. Parent-process environment via /proc/$PPID/environ
+#     → handles: CYBRX_LICENSE=... sudo dpkg   (var before sudo — sudo strips it,
+#       but it still lives in the calling shell's /proc entry)
+#  3. Well-known fallback paths an admin may have pre-placed the file
+#  4. Interactive prompt (if a terminal is attached)
+#  5. Abort with clear re-install instructions
+# ─────────────────────────────────────────────────────────────────────────────
+CONF_PATH=""
+
+# 1. Direct env var (works when: sudo CYBRX_LICENSE=... dpkg  OR  sudo -E dpkg)
+if [[ -n "${CYBRX_LICENSE:-}" ]]; then
+  CONF_PATH="${CYBRX_LICENSE/#\~/$HOME}"
+  echo "[INFO] License from CYBRX_LICENSE env: ${CONF_PATH}"
+fi
+
+# 2. Parent-process environment — catches: CYBRX_LICENSE=... sudo dpkg
+#    sudo strips the env, but the variable is still visible in /proc/$PPID/environ
+if [[ -z "$CONF_PATH" && -r "/proc/$PPID/environ" ]]; then
+  PARENT_VAR=$(tr '\0' '\n' < "/proc/$PPID/environ" 2>/dev/null \
+               | grep '^CYBRX_LICENSE=' | cut -d= -f2- | head -1 || true)
+  if [[ -n "$PARENT_VAR" ]]; then
+    CONF_PATH="${PARENT_VAR/#\~/$HOME}"
+    echo "[INFO] License from parent process environment: ${CONF_PATH}"
+  fi
+fi
+
+# 3. Well-known fallback locations
+if [[ -z "$CONF_PATH" ]]; then
+  for fallback in \
+      "/etc/cybrx/license.conf" \
+      "/root/license.conf" \
+      "/etc/cybrxagent/license.conf"; do
+    if [[ -f "$fallback" ]]; then
+      CONF_PATH="$fallback"
+      echo "[INFO] License found at fallback path: ${CONF_PATH}"
+      break
+    fi
+  done
+fi
+
+# 4. Read from temp file created by preInst
+if [[ -z "$CONF_PATH" && -f /tmp/.cybrxagent_license_path ]]; then
+  CONF_PATH=$(cat /tmp/.cybrxagent_license_path)
+  rm -f /tmp/.cybrxagent_license_path
+fi
+
+# 5. Abort
+if [[ -z "$CONF_PATH" || ! -f "$CONF_PATH" ]]; then
+  echo "  [ERROR] License file not found or not passed from preInst: ${CONF_PATH}"
+  exit 1
+fi
+
+echo "  License: ${CONF_PATH}"
+bash "$INSTALL_SCRIPT" --config "$CONF_PATH"

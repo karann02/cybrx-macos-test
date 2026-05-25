@@ -1,0 +1,71 @@
+#!/bin/bash
+# =============================================================================
+#  CybrxAgent DEB Pre-Install hook  (preinst script)
+#
+#  Flow:
+#   Check if CYBRX_LICENSE is provided and exists. If not, abort the DEB
+#   installation BEFORE any files are extracted to disk.
+# =============================================================================
+set -euo pipefail
+
+APP_NAME="CybrxAgent"
+
+echo ""
+echo "======================================================"
+echo "  ${APP_NAME} Pre-Install Validation"
+echo "======================================================"
+
+# ── Step 1: Check CYBRX_LICENSE env var ───────────────────────────────────────
+CONF_PATH=""
+if [[ -n "${CYBRX_LICENSE:-}" ]]; then
+  CONF_PATH="${CYBRX_LICENSE/#\~/$HOME}"
+fi
+
+# ── Step 2: Walk process ancestry ─────────────────────────────────────────────
+if [[ -z "$CONF_PATH" ]]; then
+  pid=$PPID
+  depth=0
+  while [[ $pid -gt 1 && $depth -lt 10 ]]; do
+    if [[ -r "/proc/$pid/environ" ]]; then
+      val=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null \
+            | grep '^CYBRX_LICENSE=' | cut -d= -f2- | head -1 || true)
+      if [[ -n "$val" ]]; then
+        CONF_PATH="${val/#\~/$HOME}"
+        break
+      fi
+    fi
+    pid=$(grep '^PPid:' "/proc/$pid/status" 2>/dev/null | awk '{print $2}' || echo 0)
+    (( depth++ )) || true
+  done
+fi
+
+# ── Step 3: Interactive Prompt ──────────────────────────────────────────────────
+if [[ -z "$CONF_PATH" && -t 0 ]]; then
+  echo "  Enter full path to your license.conf:"
+  for attempt in 1 2 3; do
+    read -rp "  path: " INPUT_PATH
+    INPUT_PATH="${INPUT_PATH/#\~/$HOME}"
+    if [[ -f "$INPUT_PATH" ]]; then
+      CONF_PATH="$INPUT_PATH"; break
+    else
+      echo "  [ERROR] Not found: ${INPUT_PATH}"
+      [[ $attempt -eq 3 ]] && { echo "  [ERROR] Failed 3 times. Aborting install cleanly."; exit 1; }
+    fi
+  done
+fi
+
+# ── Step 4: Final validation & Temp Save ──────────────────────────────────────
+if [[ -z "$CONF_PATH" || ! -f "$CONF_PATH" ]]; then
+  echo ""
+  echo "  [ERROR] No license provided. Installation aborted."
+  echo ""
+  echo "  Re-run with license path — use ONE of these forms:"
+  echo "    sudo CYBRX_LICENSE=/path/to/license.conf dpkg -i CybrxAgent-1.0.0.deb"
+  echo "    CYBRX_LICENSE=/path/to/license.conf sudo dpkg -i CybrxAgent-1.0.0.deb"
+  echo "    sudo -E dpkg -i CybrxAgent-1.0.0.deb   (after: export CYBRX_LICENSE=...)"
+  exit 1
+fi
+
+echo "$CONF_PATH" > /tmp/.cybrxagent_license_path
+echo "  [INFO] License validation passed (${CONF_PATH}). Proceeding with installation..."
+exit 0

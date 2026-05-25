@@ -1,0 +1,127 @@
+#!/bin/bash
+# =============================================================================
+#  CybrxAgent macOS PKG Postinstall Script
+#  Runs AUTOMATICALLY after the PKG installer places application files.
+#  Runs as: root
+#  Purpose: prompt user for license.conf, copy it, register LaunchAgent.
+# =============================================================================
+
+set -euo pipefail
+
+APP_NAME="CybrxAgent"
+INSTALL_DIR="/Applications/${APP_NAME}.app"
+
+# ---------------------------------------------------------------------------
+# 1. Detect the currently-logged-in GUI user (pkg runs as root)
+# ---------------------------------------------------------------------------
+CURRENT_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "${SUDO_USER:-}")
+
+if [[ -z "$CURRENT_USER" || "$CURRENT_USER" == "root" ]]; then
+  # Fallback: last user listed in /Users that isn't root/Shared
+  CURRENT_USER=$(ls /Users | grep -v -E '^(Shared|\.localized)$' | tail -1 || echo "")
+fi
+
+if [[ -z "$CURRENT_USER" ]]; then
+  echo "[ERROR] Could not determine the logged-in user. Aborting postinstall."
+  exit 1
+fi
+
+USER_UID=$(id -u "$CURRENT_USER" 2>/dev/null || echo "501")
+USER_HOME=$(dscl . -read "/Users/${CURRENT_USER}" NFSHomeDirectory 2>/dev/null \
+            | awk '{print $2}' \
+            || echo "/Users/${CURRENT_USER}")
+
+SUPPORT_DIR="${USER_HOME}/Library/Application Support/${APP_NAME}"
+AGENT_PLIST="${USER_HOME}/Library/LaunchAgents/com.cybrx.agent.plist"
+
+echo "[1/4] Setting up support directory for user: ${CURRENT_USER}"
+mkdir -p "${SUPPORT_DIR}"
+chown "${CURRENT_USER}" "${SUPPORT_DIR}"
+
+# ---------------------------------------------------------------------------
+# 2. Prompt for license.conf via GUI dialog (runs as the logged-in user)
+# ---------------------------------------------------------------------------
+echo "[2/4] Prompting user for license.conf ..."
+
+CONFIG_FILE=$(launchctl asuser "${USER_UID}" osascript <<'OSASCRIPT' 2>/dev/null || true
+try
+    tell application "System Events"
+        activate
+        set chosenFile to choose file ¬
+            with prompt "CybrxAgent — Select your license.conf file:" ¬
+            of type {"conf"} ¬
+            with invisibles
+        POSIX path of chosenFile
+    end tell
+on error
+    return ""
+end try
+OSASCRIPT
+)
+
+if [[ -z "$CONFIG_FILE" ]]; then
+  launchctl asuser "${USER_UID}" osascript \
+    -e 'tell application "System Events" to display dialog "CybrxAgent: No license file selected.\n\nRun postinstall.sh manually from the app Resources folder to complete setup." buttons {"OK"} with title "CybrxAgent Setup"' \
+    2>/dev/null || true
+  echo "[WARN] No license file selected — postinstall incomplete."
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Copy license.conf and write install_info
+# ---------------------------------------------------------------------------
+echo "[3/4] Copying license.conf ..."
+cp "${CONFIG_FILE}" "${SUPPORT_DIR}/license.conf"
+chmod 600 "${SUPPORT_DIR}/license.conf"
+chown "${CURRENT_USER}" "${SUPPORT_DIR}/license.conf"
+
+cat > "${SUPPORT_DIR}/install_info.conf" <<EOF
+{
+  "installDir": "${INSTALL_DIR}"
+}
+EOF
+chown "${CURRENT_USER}" "${SUPPORT_DIR}/install_info.conf"
+
+# ---------------------------------------------------------------------------
+# 4. Register LaunchAgent for auto-start on every login
+# ---------------------------------------------------------------------------
+echo "[4/4] Registering LaunchAgent for auto-start ..."
+mkdir -p "${USER_HOME}/Library/LaunchAgents"
+chown "${CURRENT_USER}" "${USER_HOME}/Library/LaunchAgents"
+
+cat > "${AGENT_PLIST}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.cybrx.agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${INSTALL_DIR}/Contents/MacOS/${APP_NAME}</string>
+  </array>
+  <!-- Start automatically at login -->
+  <key>RunAtLoad</key><true/>
+  <!-- Restart automatically if the agent exits for any reason -->
+  <key>KeepAlive</key><true/>
+  <!-- Wait 10 s between restarts to avoid rapid loops -->
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>${SUPPORT_DIR}/agent-stdout.log</string>
+  <key>StandardErrorPath</key><string>${SUPPORT_DIR}/agent-stderr.log</string>
+</dict>
+</plist>
+EOF
+chown "${CURRENT_USER}" "${AGENT_PLIST}"
+
+# Load it now (no reboot needed)
+launchctl asuser "${USER_UID}" launchctl load "${AGENT_PLIST}" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
+launchctl asuser "${USER_UID}" osascript \
+  -e 'tell application "System Events" to display dialog "CybrxAgent installed successfully!\n\nThe agent is now running and will start automatically at every login." buttons {"OK"} default button "OK" with title "Installation Complete"' \
+  2>/dev/null || true
+
+echo "[OK] CybrxAgent postinstall complete."
+exit 0
