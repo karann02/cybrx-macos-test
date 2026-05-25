@@ -1,36 +1,44 @@
 name: macOS Test
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-build-macos:
-runs-on: macos-latest
+  build-macos:
+    runs-on: macos-latest
 
-```
-steps:
-  - name: Checkout Repo
-    uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-  - name: Show macOS Version
-    run: sw_vers
+      - name: Show macOS Version
+        run: sw_vers
 
-  - name: Install Dependencies
-    run: npm install
+      - name: Show System Info
+        run: system_profiler SPSoftwareDataType
 
-  - name: Build Electron macOS App
-    run: npm run build
+      - name: Install Dependencies
+        run: npm install
 
-  - name: Build macOS DMG
-    run: npx electron-builder --mac dmg
+      - name: Verify Electron Builder
+        run: npx electron-builder --version
 
-  - name: Upload macOS Build
-    uses: actions/upload-artifact@v4
-    with:
-      name: CybrxAgent-macOS
-      path: dist/
+      - name: Build Electron App
+        run: npm run build
+
+      - name: Build macOS DMG
+        run: npx electron-builder --mac dmg
+
+      - name: List Dist Files
+        run: ls -la dist
+
+      - name: Upload macOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: CybrxAgent-macOS
+          path: dist/
