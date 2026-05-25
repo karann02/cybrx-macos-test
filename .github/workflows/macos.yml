@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-macos:
+ build-macos:
     runs-on: macos-latest
 
     steps:
@@ -19,17 +19,11 @@ jobs:
       - name: Show macOS Version
         run: sw_vers
 
-      - name: Show System Info
-        run: system_profiler SPSoftwareDataType
-
       - name: Install Dependencies
         run: npm install
 
       - name: Verify Electron Builder
         run: npx electron-builder --version
-
-      - name: Build Electron App
-        run: npm run build
 
       - name: Build macOS DMG
         run: npx electron-builder --mac dmg
