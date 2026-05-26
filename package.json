@@ -56,11 +56,7 @@
       "output": "dist"
     },
     "files": [
-      {
-        "from": "obfuscated",
-        "to": ".",
-        "filter": ["**/*"]
-      },
+       "obfuscated/**/*",
       "package.json",
       "build/**",
       "node_modules/**",
