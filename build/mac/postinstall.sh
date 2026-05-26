@@ -70,7 +70,7 @@ try
     tell application "System Events"
         activate
         -- Yosemite compatibility: only one extension allowed
-        set chosenFile to choose file with prompt "Select your CybrxAgent configuration file" of type {"conf"}
+        set chosenFile to choose file with prompt "Select your CybrxAgent configuration file"
         POSIX path of chosenFile
     end tell
 on error
