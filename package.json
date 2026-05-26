@@ -8,7 +8,7 @@
   },
   "license": "ISC",
   "private": true,
-  "main": "main.js",
+  "main": "obfuscated/main.js",
   "type": "module",
   "homepage": "https://cybrx.ai/",
   "scripts": {
