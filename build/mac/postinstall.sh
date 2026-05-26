@@ -63,31 +63,37 @@ echo "Step 2: License accepted."
 sleep 0.5
 
 # -------------------------------
-# 3️⃣  CONFIGURATION FILE SELECTION
+# 3️⃣  CONFIGURATION FILE INPUT (CLI BASED)
 # -------------------------------
-CONFIG_FILE=$(osascript <<'END' 2>/dev/null || true
-try
-    tell application "System Events"
-        activate
-        -- Yosemite compatibility: only one extension allowed
-        set chosenFile to choose file with prompt "Select your CybrxAgent configuration file"
-        POSIX path of chosenFile
-    end tell
-on error
-    return ""
-end try
-END
-)
+
+echo ""
+echo "$divider"
+echo "Step 3: Configuration File Setup"
+echo "$divider"
+echo ""
+
+read -p "Enter full path to your config file: " CONFIG_FILE
+
+# Remove quotes if user pasted quoted path
+CONFIG_FILE=$(echo "$CONFIG_FILE" | sed 's/^"//;s/"$//')
 
 if [ -z "$CONFIG_FILE" ]; then
-  echo "❌ No configuration file selected. Installation aborted."
-  osascript -e 'tell application "System Events" to display dialog "You must select a configuration file to continue installation." buttons {"OK"} with title "Installation Cancelled"' 2>/dev/null || true
+  echo ""
+  echo "❌ No configuration file entered."
   exit 1
 fi
 
-echo "$divider"
-echo "Step 3: Config file selected → $CONFIG_FILE"
-sleep 0.5
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo ""
+  echo "❌ Config file not found:"
+  echo "$CONFIG_FILE"
+  exit 1
+fi
+
+echo ""
+echo "✅ Config file selected:"
+echo "$CONFIG_FILE"
+sleep 1
 
 # -------------------------------
 # 4️⃣  INSTALLATION DIRECTORY SELECTION
